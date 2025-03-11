@@ -53,7 +53,7 @@ class MultipleParseResponse(BaseModel):
     successful_parses: List[ParsedDocument]
     failed_files: List[dict]
 
-@router.post("/parse-and-rank", response_model=MultipleParseResponse)
+@app.post("/parse-and-rank", response_model=MultipleParseResponse)
 async def parse_and_rank_documents(
     files: List[UploadFile] = File(...),
     job_description: str = Form(...) 
@@ -66,12 +66,13 @@ async def parse_and_rank_documents(
     
     # Process all CVs first
     for file in files:
-        if not file.filename.endswith('.pdf'):
+        if not file.filename.lower().endswith(('.pdf','.docx')):
             failed_files.append({
                 "filename": file.filename,
-                "error": "Only PDF files are supported"
+                "error": "Only PDF and DOCX files are supported"
             })
             continue
+
             
         temp_path = f"temp_{file.filename}"
         try:
@@ -80,11 +81,10 @@ async def parse_and_rank_documents(
                 content = await file.read()
                 buffer.write(content)
             
-            text = parser.extract_text_from_pdf(temp_path)
+            text = parser.extract_text_from_file(temp_path)
             parse_type = "resume"
-            result = parser.parse_text(text, parse_type, os.getenv("MODEL_NAME"))
+            result = parser.parse_text(text, parse_type, MODEL_NAME)
             
-
             # Calculate score if job description is provided
             score = None
             if job_description:

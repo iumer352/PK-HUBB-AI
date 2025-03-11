@@ -1,13 +1,3 @@
-import logging
-from typing import Dict
-from PyPDF2 import PdfReader
-from io import BytesIO
-from together import Together
-import json
-
-
-logger = logging.getLogger(__name__)
-
 class ResumeParser:
     def __init__(self, api_key, temperature=0.7, top_p=0.7, top_k=50, repetition_penalty=1):
         logger.info("Initializing ResumeParser...")
@@ -23,7 +13,27 @@ class ResumeParser:
         self.repetition_penalty = repetition_penalty
 
     @staticmethod
-    def extract_text_from_pdf(pdf_path):
+    def extract_text_from_file(file_path: str):
+        logger.info(f"Starting text extraction from: {file_path}")
+        _, ext = os.path.splitext(file_path)
+        ext = ext.lower()
+
+        try:
+            if ext == ".pdf":
+                return ResumeParser._extract_text_from_pdf(file_path)
+            elif ext == ".docx":
+                return ResumeParser._extract_text_from_docx(file_path)
+            elif ext == ".doc":
+                return ResumeParser._extract_text_from_doc(file_path)
+            else:
+                logger.error(f"Unsupported file type: {ext}")
+                raise HTTPException(status_code=400, detail=f"Unsupported file type: {ext}")
+        except Exception as e:
+            logger.error(f"Text extraction failed: {str(e)}")
+            raise HTTPException(status_code=400, detail=f"Error extracting text: {str(e)}")
+
+    @staticmethod
+    def _extract_text_from_pdf(pdf_path):
         logger.info(f"Starting PDF text extraction from: {pdf_path}")
         try:
             reader = PdfReader(pdf_path)
@@ -46,6 +56,21 @@ class ResumeParser:
         except Exception as e:
             logger.error(f"PDF extraction failed: {str(e)}")
             raise HTTPException(status_code=400, detail=f"Error extracting text from PDF: {str(e)}")
+
+    @staticmethod
+    def _extract_text_from_docx(docx_path):
+        logger.info(f"Starting DOCX text extraction from: {docx_path}")
+        try:
+            doc = docx.Document(docx_path)
+            text = "\n".join([para.text for para in doc.paragraphs])
+            if not text.strip():
+                logger.error("No text content found in DOCX")
+                raise ValueError("No text found in the DOCX file.")
+            logger.info(f"Successfully extracted text from DOCX")
+            return text.strip()
+        except Exception as e:
+            logger.error(f"DOCX extraction failed: {str(e)}")
+            raise HTTPException(status_code=400, detail=f"Error extracting text from DOCX: {str(e)}")
 
     @staticmethod
     def create_prompt(text, parse_type):
